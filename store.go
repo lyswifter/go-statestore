@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/filecoin-project/go-cbor-util"
+	cborutil "github.com/filecoin-project/go-cbor-util"
 	"github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/query"
 	"go.uber.org/multierr"
@@ -93,4 +93,66 @@ func (st *StateStore) List(out interface{}) error {
 	}
 
 	return nil
+}
+
+// out: *[]T
+func (st *StateStore) ListBy(offset int, size int, out interface{}) error {
+	res, err := st.ds.Query(query.Query{
+		Offset: offset,
+		Limit:  size,
+	})
+	if err != nil {
+		return err
+	}
+	defer res.Close()
+
+	outT := reflect.TypeOf(out).Elem().Elem()
+	rout := reflect.ValueOf(out)
+
+	var errs error
+
+	for {
+		res, ok := res.NextSync()
+		if !ok {
+			break
+		}
+		if res.Error != nil {
+			return res.Error
+		}
+
+		elem := reflect.New(outT)
+		err := cborutil.ReadCborRPC(bytes.NewReader(res.Value), elem.Interface())
+		if err != nil {
+			errs = multierr.Append(errs, xerrors.Errorf("decoding state for key '%s': %w", res.Key, err))
+			continue
+		}
+
+		rout.Elem().Set(reflect.Append(rout.Elem(), elem.Elem()))
+	}
+
+	return nil
+}
+
+// out: []datastore.Key
+func (st *StateStore) ListKey() ([]string, error) {
+	res, err := st.ds.Query(query.Query{KeysOnly: true})
+	if err != nil {
+		return nil, err
+	}
+	defer res.Close()
+
+	var out []string
+	for {
+		res, ok := res.NextSync()
+		if !ok {
+			break
+		}
+
+		if res.Error != nil {
+			return nil, err
+		}
+
+		out = append(out, res.Key)
+	}
+	return out, nil
 }
