@@ -5,7 +5,7 @@ import (
 	"io"
 	"testing"
 
-	"github.com/filecoin-project/go-cbor-util"
+	cborutil "github.com/filecoin-project/go-cbor-util"
 	"github.com/ipfs/go-datastore"
 )
 
@@ -79,5 +79,64 @@ func TestList(t *testing.T) {
 
 	if !blargs[fmt.Sprintf("%d", x2)] {
 		t.Fatalf("wrong data (missing Flarp#Blarg() == %d)", x2)
+	}
+}
+
+func TestListBy(t *testing.T) {
+	x1 := byte(64)
+	x2 := byte(42)
+	x3 := byte(100)
+
+	ds := datastore.NewMapDatastore()
+
+	e1, err := cborutil.Dump(&Flarp{x: x1})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := ds.Put(datastore.NewKey("/2"), e1); err != nil {
+		t.Fatal(err)
+	}
+
+	e2, err := cborutil.Dump(&Flarp{x: x2})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := ds.Put(datastore.NewKey("/3"), e2); err != nil {
+		t.Fatal(err)
+	}
+
+	e3, err := cborutil.Dump(&Flarp{x: x3})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := ds.Put(datastore.NewKey("/4"), e3); err != nil {
+		t.Fatal(err)
+	}
+
+	st := &StateStore{ds: ds}
+
+	var out []Flarp
+	if err := st.ListBy(1, 2, &out); err != nil {
+		t.Fatal(err)
+	}
+
+	if len(out) != 2 {
+		t.Fatalf("wrong len (expected %d, got %d)", 2, len(out))
+	}
+
+	blargs := make(map[string]bool)
+	for _, v := range out {
+		blargs[v.Blarg()] = true
+	}
+
+	if !blargs[fmt.Sprintf("%d", x2)] {
+		t.Fatalf("wrong data (missing Flarp#Blarg() == %d)", x2)
+	}
+
+	if !blargs[fmt.Sprintf("%d", x3)] {
+		t.Fatalf("wrong data (missing Flarp#Blarg() == %d)", x3)
 	}
 }
