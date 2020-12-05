@@ -49,6 +49,16 @@ func (st *StateStore) Begin(i interface{}, state interface{}) error {
 	return st.ds.Put(k, b)
 }
 
+func (st *StateStore) Update(i interface{}, state interface{}) error {
+	k := ToKey(i)
+	b, err := cborutil.Dump(state)
+	if err != nil {
+		return err
+	}
+
+	return st.ds.Put(k, b)
+}
+
 func (st *StateStore) Get(i interface{}) *StoredState {
 	return &StoredState{
 		ds:   st.ds,
